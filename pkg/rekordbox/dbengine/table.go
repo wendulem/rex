@@ -39,6 +39,9 @@ func (db *DbEngine) GetTable(pageType page.Type) (*Table, error) {
 	nextPage := idx.IndexHeader.NextPage
 
 	for {
+		if nextPage == emptyTable {
+			break
+		}
 		var data *page.Data
 		err = db.seekToPage(nextPage)
 		if err != nil {
