@@ -139,12 +139,14 @@ func (t *BeatGridTag) TagType() TagType                    { return TagTypeBeatG
 func (t *BeatGridTag) MarshalBinary() ([]byte, error)      { return nil, fmt.Errorf("not implemented") }
 func (t *BeatGridTag) UnmarshalBinary(data []byte) error   { return fmt.Errorf("not implemented") }
 
-type PathTag struct{}
+type PathTag struct {
+	Path string
+}
 
 func (t *PathTag) FourCC() [4]byte                         { return [4]byte{'P', 'P', 'T', 'H'} }
 func (t *PathTag) TagType() TagType                        { return TagTypePath }
-func (t *PathTag) MarshalBinary() ([]byte, error)          { return nil, fmt.Errorf("not implemented") }
-func (t *PathTag) UnmarshalBinary(data []byte) error       { return fmt.Errorf("not implemented") }
+func (t *PathTag) MarshalBinary() ([]byte, error)          { return pathTagMarshalBinary(t) }
+func (t *PathTag) UnmarshalBinary(data []byte) error       { return pathTagUnmarshalBinary(t, data) }
 
 type CueListTag struct{}
 
