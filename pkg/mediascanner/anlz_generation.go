@@ -14,7 +14,7 @@ import (
 )
 
 // GenerateAnalysisFile creates a Pioneer DJ analysis file (.DAT) for a track
-func GenerateAnalysisFile(ctx context.Context, track *library.Track, basedir string) error {
+func GenerateAnalysisFile(ctx context.Context, track *library.Track, basedir string, cueLibrary *library.CueLibrary) error {
 	// Initialize audio analyzer
 	analyzer := audioproc.NewAubioAnalyzer(nil)
 	
@@ -43,9 +43,8 @@ func GenerateAnalysisFile(ctx context.Context, track *library.Track, basedir str
 	beatGridTag := createBeatGridTag(analysis, track)
 	file.Tags = append(file.Tags, beatGridTag)
 	
-	// Add empty cue list (users will add cues on CDJ)
-	// We could populate this from Mixxx if available, but for now it's empty
-	cueTag := &anlz.CueListExtendedTag{}
+	// Add cue list (from cueLibrary or empty)
+	cueTag := createCueTag(track, cueLibrary)
 	file.Tags = append(file.Tags, cueTag)
 	
 	// Calculate ANLZ file path
@@ -159,7 +158,7 @@ func GenerateAnalysisPathForTrack(track *library.Track, basedir string) string {
 }
 
 // GenerateAnalysisFilesForLibrary generates ANLZ files for all tracks in a library
-func GenerateAnalysisFilesForLibrary(ctx context.Context, lib *library.Library, basedir string) error {
+func GenerateAnalysisFilesForLibrary(ctx context.Context, lib *library.Library, basedir string, cueLibrary *library.CueLibrary) error {
 	tracks := lib.Tracks().All()
 	
 	for i, track := range tracks {
@@ -167,7 +166,7 @@ func GenerateAnalysisFilesForLibrary(ctx context.Context, lib *library.Library, 
 		fmt.Printf("\r[%6d/%6d] Generating analysis for %s", i+1, len(tracks), track.Title)
 		
 		// Generate analysis file
-		err := GenerateAnalysisFile(ctx, track, basedir)
+		err := GenerateAnalysisFile(ctx, track, basedir, cueLibrary)
 		if err != nil {
 			// Log warning but continue with other tracks
 			fmt.Printf("\nWarning: analysis for %q failed: %v\n", track.Title, err)
@@ -177,6 +176,82 @@ func GenerateAnalysisFilesForLibrary(ctx context.Context, lib *library.Library, 
 	
 	fmt.Printf("\r[%6d/%6d] Analysis files generated\n", len(tracks), len(tracks))
 	return nil
+}
+
+// createCueTag creates a PCO2 cue list tag from the cue library
+func createCueTag(track *library.Track, cueLibrary *library.CueLibrary) *anlz.CueListExtendedTag {
+	// Get cues for this track
+	var cues []library.CuePoint
+	if cueLibrary != nil {
+		cues = cueLibrary.GetCuesForTrack(track.Path)
+	}
+	
+	// Convert to ANLZ cue entries
+	entries := make([]anlz.CueEntry, 0, len(cues))
+	
+	for _, cue := range cues {
+		entry := anlz.CueEntry{
+			HotCueNumber:    uint32(cue.Number),
+			Time:            uint32(cue.Time.Milliseconds()),
+			Comment:         cue.Label,
+			LoopNumerator:   0,
+			LoopDenominator: 0,
+		}
+		
+		// Set type (cue point or loop)
+		if cue.Type == library.CueTypeLoop {
+			entry.Type = 2 // Loop
+			entry.LoopTime = uint32(cue.LoopEnd.Milliseconds())
+		} else {
+			entry.Type = 1 // Cue point
+			entry.LoopTime = 0
+		}
+		
+		// Set color
+		entry.ColorCode = uint8(cue.ColorCode)
+		entry.ColorRed, entry.ColorGreen, entry.ColorBlue = getRGBForColorCode(uint8(cue.ColorCode))
+		
+		entries = append(entries, entry)
+	}
+	
+	// Determine type: hot cues vs memory points
+	// If any cue has number > 0, it's hot cues
+	tagType := uint32(1) // Default to hot cues
+	if len(entries) > 0 && entries[0].HotCueNumber == 0 {
+		tagType = 0 // Memory points
+	}
+	
+	return &anlz.CueListExtendedTag{
+		Type:    tagType,
+		Entries: entries,
+	}
+}
+
+// getRGBForColorCode converts a color code to RGB values
+func getRGBForColorCode(code uint8) (uint8, uint8, uint8) {
+	// Default green
+	if code == 0 {
+		return 0, 255, 0
+	}
+
+	// Basic rekordbox palette
+	colors := [][3]uint8{
+		{255, 0, 0},     // 1: Red
+		{255, 128, 0},   // 2: Orange
+		{255, 255, 0},   // 3: Yellow
+		{0, 255, 0},     // 4: Green
+		{0, 255, 255},   // 5: Cyan
+		{0, 0, 255},     // 6: Blue
+		{255, 0, 255},   // 7: Magenta
+		{255, 255, 255}, // 8: White
+	}
+
+	if code > 0 && int(code) <= len(colors) {
+		return colors[code-1][0], colors[code-1][1], colors[code-1][2]
+	}
+
+	// Default to green for unknown codes
+	return 0, 255, 0
 }
 
 // ValidateAnalysisFile checks if an ANLZ file exists and is valid

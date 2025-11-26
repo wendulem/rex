@@ -157,12 +157,15 @@ func (t *CueListTag) TagType() TagType                     { return TagTypeCueLi
 func (t *CueListTag) MarshalBinary() ([]byte, error)       { return nil, fmt.Errorf("not implemented") }
 func (t *CueListTag) UnmarshalBinary(data []byte) error    { return fmt.Errorf("not implemented") }
 
-type CueListExtendedTag struct{}
+type CueListExtendedTag struct {
+	Type    uint32     // 0 = memory points, 1 = hot cues
+	Entries []CueEntry
+}
 
 func (t *CueListExtendedTag) FourCC() [4]byte              { return [4]byte{'P', 'C', 'O', '2'} }
 func (t *CueListExtendedTag) TagType() TagType             { return TagTypeCueListExtended }
-func (t *CueListExtendedTag) MarshalBinary() ([]byte, error) { return nil, fmt.Errorf("not implemented") }
-func (t *CueListExtendedTag) UnmarshalBinary(data []byte) error { return fmt.Errorf("not implemented") }
+func (t *CueListExtendedTag) MarshalBinary() ([]byte, error) { return cueListExtendedTagMarshalBinary(t) }
+func (t *CueListExtendedTag) UnmarshalBinary(data []byte) error { return cueListExtendedTagUnmarshalBinary(t, data) }
 
 type WaveformPreviewTag struct{}
 

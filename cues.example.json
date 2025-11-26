@@ -1,0 +1,58 @@
+{
+  "tracks": [
+    {
+      "path": "/Users/dj/Music/track1.mp3",
+      "cues": [
+        {
+          "number": 1,
+          "time_ms": 15000,
+          "type": "point",
+          "label": "Intro",
+          "color": 0
+        },
+        {
+          "number": 2,
+          "time_ms": 45000,
+          "type": "point",
+          "label": "Build Up",
+          "color": 3
+        },
+        {
+          "number": 3,
+          "time_ms": 75000,
+          "type": "point",
+          "label": "Drop",
+          "color": 1
+        },
+        {
+          "number": 4,
+          "time_ms": 105000,
+          "type": "loop",
+          "loop_end_ms": 109000,
+          "label": "Break Loop",
+          "color": 6
+        }
+      ]
+    },
+    {
+      "path": "/Users/dj/Music/track2.mp3",
+      "cues": [
+        {
+          "number": 1,
+          "time_ms": 30000,
+          "type": "point",
+          "label": "Start",
+          "color": 4
+        },
+        {
+          "number": 2,
+          "time_ms": 90000,
+          "type": "point",
+          "label": "Chorus",
+          "color": 5
+        }
+      ]
+    }
+  ]
+}
+

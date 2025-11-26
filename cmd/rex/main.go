@@ -44,6 +44,7 @@ func run() error {
 	basedir := flag.String("root", "./", "Root path of USB drive")
 	trackDir := flag.String("trackdir", "rex", "Where on the USB drive to put exported files, relative to root path")
 	sourceDir := flag.String("source", "", "Directory containing audio files to export")
+	cuesFile := flag.String("cues", "", "Optional JSON file with hot cues and loops")
 	forceOverwrite := flag.Bool("f", false, "Overwrite export file if it exists")
 	flag.Parse()
 
@@ -137,6 +138,30 @@ func run() error {
 
 	fmt.Printf("\033[2K\r")
 	fmt.Printf("All tracks copied to destination\n")
+	
+	// Load hot cues if provided
+	var cueLibrary *library.CueLibrary
+	if *cuesFile != "" {
+		fmt.Printf("Loading hot cues from: %s\n", *cuesFile)
+		cueLibrary, err = library.LoadCuesFromJSON(*cuesFile)
+		if err != nil {
+			return fmt.Errorf("load cues: %w", err)
+		}
+		totalCues := 0
+		for _, cues := range cueLibrary.Cues {
+			totalCues += len(cues)
+		}
+		fmt.Printf("Loaded %d hot cues for %d tracks\n", totalCues, len(cueLibrary.Cues))
+	}
+	
+	// Generate analysis files (.DAT) for CDJ compatibility
+	fmt.Printf("Generating analysis files...\n")
+	err = mediascanner.GenerateAnalysisFilesForLibrary(ctx, lib, *basedir, cueLibrary)
+	if err != nil {
+		fmt.Printf("Warning: analysis file generation had errors: %v\n", err)
+		fmt.Printf("Continuing with PDB generation...\n")
+	}
+	
 	fmt.Printf("Writing PDB file...\n")
 
 	// Intermediary type for storing "INSERT statements"
