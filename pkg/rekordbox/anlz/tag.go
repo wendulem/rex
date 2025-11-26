@@ -132,12 +132,14 @@ func UnmarshalTagHeader(data []byte) (*TagHeader, error) {
 // Stub tag types (to be implemented in separate files)
 // These are referenced in anlz.go's createTagForFourCC
 
-type BeatGridTag struct{}
+type BeatGridTag struct {
+	Beats []Beat
+}
 
 func (t *BeatGridTag) FourCC() [4]byte                     { return [4]byte{'P', 'Q', 'T', 'Z'} }
 func (t *BeatGridTag) TagType() TagType                    { return TagTypeBeatGrid }
-func (t *BeatGridTag) MarshalBinary() ([]byte, error)      { return nil, fmt.Errorf("not implemented") }
-func (t *BeatGridTag) UnmarshalBinary(data []byte) error   { return fmt.Errorf("not implemented") }
+func (t *BeatGridTag) MarshalBinary() ([]byte, error)      { return beatGridTagMarshalBinary(t) }
+func (t *BeatGridTag) UnmarshalBinary(data []byte) error   { return beatGridTagUnmarshalBinary(t, data) }
 
 type PathTag struct {
 	Path string
