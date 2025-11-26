@@ -298,7 +298,7 @@ func PdbTrack(lib *library.Library, t *library.Track, baseDir string) track.Trac
 		DateAdded:   t.AddedDate.Format(isoDateFormat),
 		Filename:    filepath.Base(t.Path),
 		Title:       t.Title,
-		// AnalyzePath: "/PIONEER/USBANLZ/P016/0000875E/ANLZ0000.DAT",
+		AnalyzePath: GenerateAnalysisPathForTrack(t, baseDir),
 	}
 }
 
