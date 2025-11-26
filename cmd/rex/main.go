@@ -2,16 +2,15 @@ package main
 
 import (
 	`context`
-	`database/sql`
 	`flag`
 	`fmt`
 	`io`
 	`os`
 	`path/filepath`
+	`strings`
 
 	`github.com/ambientsound/rex/pkg/library`
 	`github.com/ambientsound/rex/pkg/mediascanner`
-	`github.com/ambientsound/rex/pkg/mixxx`
 	`github.com/ambientsound/rex/pkg/rekordbox/color`
 	`github.com/ambientsound/rex/pkg/rekordbox/column`
 	`github.com/ambientsound/rex/pkg/rekordbox/dbengine`
@@ -20,8 +19,6 @@ import (
 	`github.com/ambientsound/rex/pkg/rekordbox/playlist`
 	`github.com/ambientsound/rex/pkg/rekordbox/unknown17`
 	`github.com/ambientsound/rex/pkg/rekordbox/unknown18`
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -35,7 +32,7 @@ func main() {
 func run() error {
 	var err error
 
-	fmt.Printf("REX: unofficial Pioneer DJ export.pdb generator\n")
+	fmt.Printf("REX: Pioneer DJ export generator from audio files\n")
 	fmt.Printf("This software is neither supported nor endorsed by Pioneer.\n")
 	fmt.Printf("Please do not rely on it for serious use.\n")
 
@@ -46,23 +43,26 @@ func run() error {
 	// Initialize options
 	basedir := flag.String("root", "./", "Root path of USB drive")
 	trackDir := flag.String("trackdir", "rex", "Where on the USB drive to put exported files, relative to root path")
+	sourceDir := flag.String("source", "", "Directory containing audio files to export")
 	forceOverwrite := flag.Bool("f", false, "Overwrite export file if it exists")
-	mixxxdbPath := flag.String("mixxxdb", defaultMixxxDbPath(), "Path to Mixxx database")
 	flag.Parse()
+
+	if *sourceDir == "" {
+		return fmt.Errorf("must specify -source directory with audio files")
+	}
 
 	*basedir, err = filepath.Abs(*basedir)
 	if err != nil {
 		return err
 	}
 
-	// Open Mixxx database
-	sqliteHandle, err := sql.Open("sqlite3", *mixxxdbPath)
+	// Scan for audio files
+	fmt.Printf("Scanning for audio files in: %s\n", *sourceDir)
+	audioFiles, err := scanAudioFiles(*sourceDir)
 	if err != nil {
-		return fmt.Errorf("open Mixxx database: %w", err)
+		return fmt.Errorf("scan audio files: %w", err)
 	}
-	defer sqliteHandle.Close()
-	mixxxdb := mixxx.New(sqliteHandle)
-	fmt.Printf("Mixxx database opened: %s\n", *mixxxdbPath)
+	fmt.Printf("Found %d audio files\n", len(audioFiles))
 
 	// Create output directories
 	outputPath := filepath.Join(*basedir, "PIONEER", "rekordbox")
@@ -97,95 +97,32 @@ func run() error {
 	defer out.Close()
 	fmt.Printf("PIONEER database created: %s\n", outputFile)
 
-	// Scan Mixxx library for tracks
-	srcTracks, err := mixxxdb.ListTracks(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Found %d tracks in Mixxx database\n", len(srcTracks))
-	trackCandidates := make(map[string]*library.Track, len(srcTracks))
-	for i, track := range srcTracks {
-		t := mediascanner.TrackFromMixxx(track)
-		trackCandidates[t.Path] = t
-		fmt.Printf("\033[2K\r[%6d/%6d] %s", i+1, len(srcTracks), t.Title)
+	// Probe each audio file for metadata
+	fmt.Printf("Analyzing audio files...\n")
+	for i, audioPath := range audioFiles {
+		fmt.Printf("\033[2K\r[%6d/%6d] %s", i+1, len(audioFiles), filepath.Base(audioPath))
+
+		probe, err := mediascanner.ProbeMetadata(ctx, audioPath)
+		if err != nil {
+			fmt.Printf("\nWarning: skipping %s: %v\n", audioPath, err)
+			continue
+		}
+
+		track := mediascanner.TrackFromFile(lib, audioPath, *probe)
+		lib.InsertTrack(track)
 	}
 	fmt.Printf("\033[2K\r")
-	fmt.Printf("Tracks imported.\n")
+	fmt.Printf("Analyzed %d tracks\n", len(lib.Tracks().All()))
 
-	// Create playlists
-	mixxPlaylists, err := mixxxdb.ListPlaylists(ctx)
-	if err != nil {
-		return err
+	// Create a single "All Tracks" playlist
+	allTracksPlaylist := &library.Playlist{
+		ID:     1,
+		Name:   "All Tracks",
+		Tracks: lib.Tracks().All(),
 	}
-	for _, plist := range mixxPlaylists {
-		if plist.Hidden > 0 {
-			continue
-		}
-		tracks, err := mixxxdb.ListPlaylistTracks(ctx, sql.NullInt64{Int64: plist.ID, Valid: true})
-		if err != nil {
-			return err
-		}
-		pplist := &library.Playlist{
-			ID:     library.ID(plist.ID),
-			Name:   "P: " + plist.Name.String,
-			Tracks: make([]*library.Track, 0),
-		}
-		for _, track := range tracks {
-			t := lib.Tracks().GetByName(track.Path.String)
-			if t == nil {
-				var found bool
-				t, found = trackCandidates[track.Path.String]
-				if !found {
-					return fmt.Errorf("database incoherent: %s not found", track.Path.String)
-				}
-				lib.InsertTrack(t)
-				delete(trackCandidates, track.Path.String)
-			}
-			pplist.Tracks = append(pplist.Tracks, t)
-		}
-		lib.Playlists().Insert(pplist)
-		fmt.Printf("Playlist %q loaded with %d tracks\n", pplist.Name, len(pplist.Tracks))
-	}
+	lib.Playlists().Insert(allTracksPlaylist)
 
-	// Create playlists from crates
-	mixxCrates, err := mixxxdb.ListCrates(ctx)
-	if err != nil {
-		return err
-	}
-	for _, crate := range mixxCrates {
-		if crate.Show.Int64 == 0 {
-			continue
-		}
-		if crate.Locked.Int64 > 0 {
-			continue
-		}
-		tracks, err := mixxxdb.ListCrateTracks(ctx, crate.ID)
-		if err != nil {
-			return err
-		}
-		pplist := &library.Playlist{
-			ID:     library.ID(crate.ID),
-			Name:   "C: " + crate.Name,
-			Tracks: make([]*library.Track, 0),
-		}
-		for _, track := range tracks {
-			t := lib.Tracks().GetByName(track.Path.String)
-			if t == nil {
-				var found bool
-				t, found = trackCandidates[track.Path.String]
-				if !found {
-					return fmt.Errorf("database incoherent: %s not found", track.Path.String)
-				}
-				lib.InsertTrack(t)
-				delete(trackCandidates, track.Path.String)
-			}
-			pplist.Tracks = append(pplist.Tracks, t)
-		}
-		lib.Playlists().Insert(pplist)
-		fmt.Printf("Crate %q loaded with %d tracks\n", pplist.Name, len(pplist.Tracks))
-	}
-
-	fmt.Printf("Tracks marked for export: %6d used/%6d total\n", len(lib.Tracks().All()), len(srcTracks))
+	fmt.Printf("Tracks marked for export: %d\n", len(lib.Tracks().All()))
 	fmt.Printf("Copying or encoding tracks to %s\n", *trackDir)
 
 	for i, t := range lib.Tracks().All() {
@@ -346,7 +283,26 @@ func run() error {
 	return nil
 }
 
-func defaultMixxxDbPath() string {
-	homedir, _ := os.UserHomeDir()
-	return filepath.Join(homedir, ".mixxx", "mixxxdb.sqlite")
+// scanAudioFiles recursively scans a directory for audio files
+func scanAudioFiles(rootDir string) ([]string, error) {
+	var files []string
+
+	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".m4a" {
+			files = append(files, path)
+		}
+
+		return nil
+	})
+
+	return files, err
 }

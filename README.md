@@ -1,10 +1,9 @@
-# rex: rekordbox exporter for Mixxx
+# rex: rekordbox exporter from audio files
 
-Open source mixing or library software should be able to create Rekordbox
-compatible export files, so that they can be played on Pioneer equipment in
-venues all over the world.
+Create Rekordbox-compatible export files from any folder of audio files (MP3, WAV, FLAC, M4A),
+allowing them to be played on Pioneer CDJ equipment.
 
-This project is my attempt at getting closer to this goal, and leans heavily on the work done by others.
+This project leans heavily on the reverse engineering work done by others.
 A good starting point is: https://djl-analysis.deepsymmetry.org/rekordbox-export-analysis/
 
 ## Project state
@@ -21,12 +20,13 @@ might be of particular interest. Many tests are broken, they might not be releva
 
 ## Prerequisites
 
-This software exports Mixxx libraries, you must have a fairly recent version of Mixxx installed.
+REX requires **FFMPEG** to analyze and transcode audio files. Make sure `ffmpeg` and `ffprobe` are in your PATH.
 
-REX has only been tested on Arch Linux with Mixxx 2.3.4.
-Your results may vary.
-
-REX requires FFMPEG to transcode audio files.
+Supported audio formats:
+- MP3
+- WAV
+- FLAC
+- M4A/AAC
 
 ## Formatting USB sticks
 
@@ -37,18 +37,37 @@ mkfs.fat -c -F 32 -n label -S 512 /dev/sdX
 
 ## Generate exports
 
-This software has been tested successfully with Go 1.20.
+This software has been tested successfully with Go 1.20+.
 
-Use [REX](cmd/rex/main.go) to generate PDB files from your Mixxx library.
+Use [REX](cmd/rex/main.go) to generate PDB files from a folder of audio files:
 
-```
+```bash
+# Build
 go build -o rex cmd/rex/main.go
-./rex -root /path/to/USB
+
+# Generate export
+./rex -root /path/to/USB -source /path/to/music/folder
 ```
 
-Your copied audio files will be put in the `rex` folder on the USB media,
-you can change this with `-trackdir my-audio-files`. If your Mixxx library
-is not in the correct place, you can change it with `-mixxxdb /path/to/mixxxdb.sqlite3`.
+### Options
+
+- `-root <path>` - Root path of USB drive (required)
+- `-source <path>` - Directory containing audio files to export (required)
+- `-trackdir <name>` - Folder name on USB for audio files (default: "rex")
+- `-f` - Force overwrite existing export.pdb
+
+### Example
+
+```bash
+# Export all music from ~/Music/DJ folder to USB drive
+./rex -root /Volumes/USB_DRIVE -source ~/Music/DJ
+
+# Use custom track directory
+./rex -root /Volumes/USB_DRIVE -source ~/Music/DJ -trackdir my-tracks
+```
+
+Your audio files will be copied to the USB drive and organized in the specified track directory.
+MP3 files are copied directly, other formats are transcoded to MP3.
 
 These features are NOT supported yet:
 

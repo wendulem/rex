@@ -15,7 +15,6 @@ import (
 	`time`
 
 	`github.com/ambientsound/rex/pkg/library`
-	`github.com/ambientsound/rex/pkg/mixxx`
 	`github.com/ambientsound/rex/pkg/rekordbox/album`
 	`github.com/ambientsound/rex/pkg/rekordbox/artist`
 	`github.com/ambientsound/rex/pkg/rekordbox/track`
@@ -25,6 +24,7 @@ type Probe struct {
 	Format struct {
 		Filesize string `json:"size"`
 		Duration string `json:"duration"`
+		Bitrate  string `json:"bit_rate"`
 		Tags     struct {
 			Title       string `json:"title"`
 			Artist      string `json:"artist"`
@@ -32,12 +32,18 @@ type Probe struct {
 			Genre       string `json:"genre"`
 			TrackNumber string `json:"track"`
 			Date        string `json:"date"`
+			BPM         string `json:"bpm"`
 		} `json:"tags"`
 	} `json:"format"`
+	Streams []struct {
+		SampleRate    string `json:"sample_rate"`
+		Channels      int    `json:"channels"`
+		BitsPerSample int    `json:"bits_per_sample"`
+	} `json:"streams"`
 }
 
 func ProbeMetadata(ctx context.Context, src string) (*Probe, error) {
-	proc := exec.CommandContext(ctx, "ffprobe", "-show_format", "-print_format", "json", src)
+	proc := exec.CommandContext(ctx, "ffprobe", "-show_format", "-show_streams", "-print_format", "json", src)
 	output, err := proc.Output()
 	if err != nil {
 		return nil, err
@@ -179,22 +185,88 @@ func CopyFile(inputPath, outputPath string) error {
 
 func TrackFromFile(lib *library.Library, path string, probe Probe) *library.Track {
 	now := time.Now()
+
+	// Extract BPM from ID3 tags or use default
+	bpm := 120.0 // Default BPM
+	if probe.Format.Tags.BPM != "" {
+		if parsedBPM, err := strconv.ParseFloat(probe.Format.Tags.BPM, 64); err == nil {
+			bpm = parsedBPM
+		}
+	}
+
+	// Extract title from filename if ID3 tag is empty
+	title := probe.Format.Tags.Title
+	if title == "" {
+		title = filepath.Base(path)
+		title = strings.TrimSuffix(title, filepath.Ext(title))
+	}
+
+	// Default values for artist and album if missing
+	artist := probe.Format.Tags.Artist
+	if artist == "" {
+		artist = "Unknown Artist"
+	}
+
+	album := probe.Format.Tags.Album
+	if album == "" {
+		album = "Unknown Album"
+	}
+
+	// Extract bitrate
+	bitrate := 320
+	if probe.Format.Bitrate != "" {
+		if br, err := strconv.Atoi(probe.Format.Bitrate); err == nil {
+			bitrate = br / 1000 // Convert from bits/sec to kbits/sec
+		}
+	}
+
+	// Extract sample rate
+	sampleRate := 44100
+	if len(probe.Streams) > 0 && probe.Streams[0].SampleRate != "" {
+		if sr, err := strconv.Atoi(probe.Streams[0].SampleRate); err == nil {
+			sampleRate = sr
+		}
+	}
+
+	// Extract sample depth
+	sampleDepth := 16
+	if len(probe.Streams) > 0 && probe.Streams[0].BitsPerSample > 0 {
+		sampleDepth = probe.Streams[0].BitsPerSample
+	}
+
 	return &library.Track{
 		Path:        path,
-		Bitrate:     320,   // FIXME
-		Tempo:       128,   // FIXME
-		SampleDepth: 16,    // FIXME
-		SampleRate:  44100, // FIXME
-		DiscNumber:  0,     // FIXME
-		Isrc:        "",    // FIXME
+		Bitrate:     bitrate,
+		Tempo:       bpm,
+		SampleDepth: sampleDepth,
+		SampleRate:  float64(sampleRate),
+		DiscNumber:  0,
+		Isrc:        "",
 		FileSize:    intOrZero[int](probe.Format.Filesize),
 		TrackNumber: intOrZero[int](probe.Format.Tags.TrackNumber),
 		ReleaseDate: detectDate(probe.Format.Tags.Date),
 		AddedDate:   &now,
-		Artist:      probe.Format.Tags.Artist,
-		Album:       probe.Format.Tags.Album,
+		Artist:      artist,
+		Album:       album,
 		Duration:    parseDuration(probe.Format.Duration),
-		Title:       probe.Format.Tags.Title,
+		Title:       title,
+		FileType:    detectFileType(path),
+	}
+}
+
+func detectFileType(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".mp3":
+		return "mp3"
+	case ".wav":
+		return "wav"
+	case ".flac":
+		return "flac"
+	case ".m4a", ".aac":
+		return "aac"
+	default:
+		return "mp3"
 	}
 }
 
