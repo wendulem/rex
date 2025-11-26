@@ -41,7 +41,8 @@ func (f *File) WriteToFile(path string) error {
 	for i, tag := range f.Tags {
 		data, err := tag.MarshalBinary()
 		if err != nil {
-			return fmt.Errorf("marshal tag %d (%s): %w", i, string(tag.FourCC()[:]), err)
+			fourCC := tag.FourCC()
+			return fmt.Errorf("marshal tag %d (%s): %w", i, string(fourCC[:]), err)
 		}
 		tagData[i] = data
 		totalSize += uint32(len(data))

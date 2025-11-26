@@ -18,10 +18,22 @@ func GenerateAnalysisFile(ctx context.Context, track *library.Track, basedir str
 	// Initialize audio analyzer
 	analyzer := audioproc.NewAubioAnalyzer(nil)
 	
-	// Analyze the audio file
+	// Analyze the audio file (use graceful fallbacks on failure)
 	analysis, err := analyzer.Analyze(ctx, track.Path)
 	if err != nil {
-		return fmt.Errorf("analyze audio: %w", err)
+		// If analysis fails completely, create minimal analysis with defaults
+		fmt.Printf("\nWarning: audio analysis failed for %q: %v\n", track.Title, err)
+		fmt.Printf("Using fallback values (BPM from metadata or default)\n")
+		
+		analysis = &audioproc.Analysis{
+			BPM:      track.Tempo, // From ID3 tag or default
+			Beats:    []audioproc.BeatPosition{},
+			Duration: track.Duration,
+		}
+		
+		if analysis.BPM == 0 {
+			analysis.BPM = 120.0 // Default
+		}
 	}
 	
 	// Update track BPM if it was detected
@@ -47,12 +59,12 @@ func GenerateAnalysisFile(ctx context.Context, track *library.Track, basedir str
 	cueTag := createCueTag(track, cueLibrary)
 	file.Tags = append(file.Tags, cueTag)
 	
-	// Extract waveform data
+	// Try to extract waveform data
 	waveformSamples, err := analyzer.ExtractWaveform(ctx, track.Path, 400)
 	if err != nil {
 		// If waveform extraction fails, continue without waveforms
-		// CDJ will still work without them
-		fmt.Printf("\nWarning: waveform extraction failed for %q: %v\n", track.Title, err)
+		// CDJ will still work without them (just no visual preview)
+		// Don't print warning here - already printed if analysis failed
 	} else {
 		// Add waveform preview tags
 		waveformPreview := anlz.GenerateWaveformPreviewFromSamples(waveformSamples)

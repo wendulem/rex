@@ -4,3 +4,15 @@ bin
 analyses/
 /rekordbox/
 /output/
+
+# Build artifacts
+rex
+analyze
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test directories
+rex_test/
+outputs/

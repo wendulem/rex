@@ -91,28 +91,6 @@ func yearOrZero(tm *time.Time) uint16 {
 	return uint16(tm.Year())
 }
 
-func TrackFromMixxx(track mixxx.ListTracksRow) *library.Track {
-	trackNumber, _ := strconv.Atoi(track.Tracknumber.String)
-	return &library.Track{
-		Path:        track.Path.String,
-		Title:       track.Title.String,
-		SampleRate:  float64(track.Samplerate.Int64),
-		FileSize:    int(track.Filesize.Int64),
-		Bitrate:     int(track.Bitrate.Int64),
-		TrackNumber: trackNumber,
-		Tempo:       track.Bpm.Float64,
-		FileType:    track.Filetype.String,
-		AddedDate:   detectDate(track.DatetimeAdded.String),
-		Duration:    time.Duration(track.Duration.Float64),
-		Artist:      track.Artist.String,
-		Album:       track.Album.String,
-		// SampleDepth
-		// DiscNumber
-		// ReleaseDate
-		// Isrc
-	}
-}
-
 type RenderResult struct {
 	Action string
 }

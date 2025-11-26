@@ -91,8 +91,9 @@ func (a *AubioAnalyzer) DetectBeats(ctx context.Context, audioPath string) ([]Be
 		defer cancel()
 	}
 	
-	// Run: aubio onset -i <audioPath> -O beats
-	cmd := exec.CommandContext(ctx, a.config.AubioBin, "onset", "-i", audioPath, "-O", "beats")
+	// Run: aubio onset -i <audioPath> beats
+	// Note: different aubio versions use different syntax
+	cmd := exec.CommandContext(ctx, a.config.AubioBin, "onset", "-i", audioPath, "beats")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("aubio onset failed: %w", err)
