@@ -167,19 +167,23 @@ func (t *CueListExtendedTag) TagType() TagType             { return TagTypeCueLi
 func (t *CueListExtendedTag) MarshalBinary() ([]byte, error) { return cueListExtendedTagMarshalBinary(t) }
 func (t *CueListExtendedTag) UnmarshalBinary(data []byte) error { return cueListExtendedTagUnmarshalBinary(t, data) }
 
-type WaveformPreviewTag struct{}
+type WaveformPreviewTag struct {
+	Entries [400]byte // 400-byte waveform preview
+}
 
 func (t *WaveformPreviewTag) FourCC() [4]byte              { return [4]byte{'P', 'W', 'A', 'V'} }
 func (t *WaveformPreviewTag) TagType() TagType             { return TagTypeWaveformPreview }
-func (t *WaveformPreviewTag) MarshalBinary() ([]byte, error) { return nil, fmt.Errorf("not implemented") }
-func (t *WaveformPreviewTag) UnmarshalBinary(data []byte) error { return fmt.Errorf("not implemented") }
+func (t *WaveformPreviewTag) MarshalBinary() ([]byte, error) { return waveformPreviewTagMarshalBinary(t) }
+func (t *WaveformPreviewTag) UnmarshalBinary(data []byte) error { return waveformPreviewTagUnmarshalBinary(t, data) }
 
-type WaveformTinyPreviewTag struct{}
+type WaveformTinyPreviewTag struct {
+	Entries [100]byte // 100-byte tiny waveform preview
+}
 
 func (t *WaveformTinyPreviewTag) FourCC() [4]byte          { return [4]byte{'P', 'W', 'V', '2'} }
 func (t *WaveformTinyPreviewTag) TagType() TagType         { return TagTypeWaveformTinyPreview }
-func (t *WaveformTinyPreviewTag) MarshalBinary() ([]byte, error) { return nil, fmt.Errorf("not implemented") }
-func (t *WaveformTinyPreviewTag) UnmarshalBinary(data []byte) error { return fmt.Errorf("not implemented") }
+func (t *WaveformTinyPreviewTag) MarshalBinary() ([]byte, error) { return waveformTinyPreviewTagMarshalBinary(t) }
+func (t *WaveformTinyPreviewTag) UnmarshalBinary(data []byte) error { return waveformTinyPreviewTagUnmarshalBinary(t, data) }
 
 type WaveformDetailTag struct{}
 

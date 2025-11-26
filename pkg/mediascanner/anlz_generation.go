@@ -47,6 +47,22 @@ func GenerateAnalysisFile(ctx context.Context, track *library.Track, basedir str
 	cueTag := createCueTag(track, cueLibrary)
 	file.Tags = append(file.Tags, cueTag)
 	
+	// Extract waveform data
+	waveformSamples, err := analyzer.ExtractWaveform(ctx, track.Path, 400)
+	if err != nil {
+		// If waveform extraction fails, continue without waveforms
+		// CDJ will still work without them
+		fmt.Printf("\nWarning: waveform extraction failed for %q: %v\n", track.Title, err)
+	} else {
+		// Add waveform preview tags
+		waveformPreview := anlz.GenerateWaveformPreviewFromSamples(waveformSamples)
+		file.Tags = append(file.Tags, waveformPreview)
+		
+		// Add tiny waveform preview
+		waveformTiny := anlz.GenerateWaveformTinyPreviewFromSamples(waveformSamples)
+		file.Tags = append(file.Tags, waveformTiny)
+	}
+	
 	// Calculate ANLZ file path
 	anlzPath := calculateAnalysisPath(track, basedir)
 	

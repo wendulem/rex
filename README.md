@@ -14,12 +14,13 @@ A good starting point is: https://djl-analysis.deepsymmetry.org/rekordbox-export
 - ✅ Beat grid generation (sync works on CDJs!)
 - ✅ Analysis file generation (.DAT files)
 - ✅ Hot cues and loops (via JSON input)
+- ✅ Waveform preview (visual navigation on CDJs!)
 - ✅ Playlist support
 
 **Not yet implemented:**
-- ❌ Waveforms (extraction done, tag implementation pending)
 - ❌ Album artwork
-- ❌ Song structure (lighting control)
+- ❌ Detailed color waveforms (PWV4/PWV5)
+- ❌ Song structure (lighting control for CDJ-3000)
 
 This software generates Pioneer-compatible exports that work on CDJs for basic DJing.
 Test thoroughly before relying on it for important gigs.
@@ -121,6 +122,8 @@ MP3 files are copied directly, other formats are transcoded to MP3.
 - ✅ Load tracks
 - ✅ See BPM (detected via aubio)
 - ✅ Use sync/beatmatch (beat grids working!)
+- ✅ See waveform preview (visual navigation!)
+- ✅ Use needle drop (jump to any position)
 - ✅ Browse by artist/album
 - ✅ Access playlists
 - ✅ Use hot cues (from JSON file or add on-device)
